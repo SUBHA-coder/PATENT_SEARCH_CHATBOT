@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patent Search Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-export {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+
+        .btn-clear {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #e53e3e;
+            transform: translateY(-2px);
+        }
+
+        .chat-container {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #f7fafc;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 15px 20px;
+            border-radius: 15px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            color: #2d3748;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .patent-card {
+            background: #edf2f7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .patent-card h3 {
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .patent-card p {
+            font-size: 14px;
+            color: #4a5568;
+            margin: 5px 0;
+        }
+
+        .patent-card .patent-number {
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .summary-section {
+            background: #e6fffa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #38b2ac;
+        }
+
+        .summary-section h3 {
+            color: #38b2ac;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .summary-section p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #2d3748;
+            white-space: pre-wrap;
+        }
+
+        .input-container {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+
+        #searchInput {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #searchInput:focus {
+            border-color: #667eea;
+        }
+
+        #limitSelect {
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .btn-send {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-send:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: flex;
+            gap: 5px;
+            padding: 10px;
+        }
+
+        .loading span {
+            width: 10px;
+            height: 10px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading span:nth-child(1) { animation-delay: -0.32s; }
+        .loading span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 50px 20px;
+            color: #718096;
+        }
+
+        .welcome-message h2 {
+            font-size: 28px;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .welcome-message p {
+            font-size: 16px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Patent Search Chatbot</h1>
+            <div class="header-buttons">
+                <button class="btn btn-export" onclick="exportCSV()">📥 Export CSV</button>
+                <button class="btn btn-clear" onclick="clearHistory()">🗑️ Clear History</button>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <h2>Welcome to Patent Search Assistant!</h2>
+                <p>Search for patents and get AI-powered summaries instantly.</p>
+                <p style="margin-top: 10px; font-size: 14px;">Try searching for: "artificial intelligence", "solar panels", "medical devices"</p>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search for patents (e.g., 'machine learning', 'renewable energy')..."
+                    onkeypress="handleKeyPress(event)"
+                >
+                <select id="limitSelect">
+                    <option value="5">5 results</option>
+                    <option value="10" selected>10 results</option>
+                    <option value="15">15 results</option>
+                    <option value="20">20 results</option>
+                </select>
+            </div>
+            <button class="btn-send" onclick="searchPatents()" id="sendBtn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const chatContainer = document.getElementById('chatContainer');
+        const searchInput = document.getElementById('searchInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const limitSelect = document.getElementById('limitSelect');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+        });
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                searchPatents();
+            }
+        }
+
+        function ensureWelcomeState() {
+            const hasMessages = chatContainer.querySelector('.message');
+            if (!hasMessages) {
+                chatContainer.innerHTML = `
+                    <div class="welcome-message">
+                        <h2>Welcome to Patent Search Assistant!</h2>
+                        <p>Search for patents and get AI-powered summaries instantly.</p>
+                        <p style="margin-top: 10px; font-size: 14px;">Try searching for: "artificial intelligence", "solar panels", "medical devices"</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function searchPatents() {
+            const query = searchInput.value.trim();
+            const limit = parseInt(limitSelect.value, 10);
+
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            const welcomeMsg = document.querySelector('.welcome-message');
+            if (welcomeMsg) {
+                welcomeMsg.remove();
+            }
+
+            addMessage('user', query);
+            searchInput.value = '';
+
+            const loadingId = addLoadingMessage();
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ query, limit })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Search failed');
+                }
+
+                const data = await response.json();
+                removeLoadingMessage(loadingId);
+                addPatentResults(data);
+            } catch (error) {
+                removeLoadingMessage(loadingId);
+                addMessage('bot', `Error: ${error.message}. Please make sure the backend server is running.`);
+            } finally {
+                sendBtn.disabled = false;
+                ensureWelcomeState();
+            }
+        }
+
+        function addMessage(type, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function addPatentResults(data) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            const patents = Array.isArray(data.patents) ? data.patents : [];
+
+            if (patents.length === 0) {
+                const emptyState = document.createElement('p');
+                emptyState.textContent = 'No patents found. Try different keywords.';
+                contentDiv.appendChild(emptyState);
+            } else {
+                const intro = document.createElement('p');
+                const introStrong = document.createElement('strong');
+                introStrong.textContent = `Found ${patents.length} patents:`;
+                intro.appendChild(introStrong);
+                contentDiv.appendChild(intro);
+
+                patents.forEach((patent, index) => {
+                    const patentCard = document.createElement('div');
+                    patentCard.className = 'patent-card';
+
+                    const titleEl = document.createElement('h3');
+                    titleEl.textContent = `${index + 1}. ${patent.title || 'Untitled patent'}`;
+                    patentCard.appendChild(titleEl);
+
+                    const numberEl = document.createElement('p');
+                    numberEl.className = 'patent-number';
+                    numberEl.textContent = `Patent #: ${patent.patent_number || 'N/A'}`;
+                    patentCard.appendChild(numberEl);
+
+                    if (patent.type) {
+                        const typeEl = document.createElement('p');
+                        const typeStrong = document.createElement('strong');
+                        typeStrong.textContent = 'Type:';
+                        typeEl.appendChild(typeStrong);
+                        typeEl.append(` ${patent.type}`);
+                        patentCard.appendChild(typeEl);
+                    }
+
+                    const dateEl = document.createElement('p');
+                    const dateStrong = document.createElement('strong');
+                    dateStrong.textContent = 'Date:';
+                    dateEl.appendChild(dateStrong);
+                    dateEl.append(` ${patent.date || 'N/A'}`);
+                    patentCard.appendChild(dateEl);
+
+                    const assigneeEl = document.createElement('p');
+                    const assigneeStrong = document.createElement('strong');
+                    assigneeStrong.textContent = 'Assignee:';
+                    assigneeEl.appendChild(assigneeStrong);
+                    assigneeEl.append(` ${patent.assignee || 'N/A'}`);
+                    patentCard.appendChild(assigneeEl);
+
+                    const abstractEl = document.createElement('p');
+                    const abstractStrong = document.createElement('strong');
+                    abstractStrong.textContent = 'Abstract:';
+                    abstractEl.appendChild(abstractStrong);
+                    const abstractText = patent.abstract || 'No abstract provided.';
+                    const truncated = abstractText.length > 200 ? `${abstractText.substring(0, 200)}...` : abstractText;
+                    abstractEl.append(` ${truncated}`);
+                    patentCard.appendChild(abstractEl);
+
+                    contentDiv.appendChild(patentCard);
+                });
+
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'summary-section';
+
+                const summaryHeading = document.createElement('h3');
+                summaryHeading.textContent = '🤖 AI Summary';
+                summaryDiv.appendChild(summaryHeading);
+
+                const summaryText = document.createElement('p');
+                summaryText.textContent = data.summary || 'No summary generated.';
+                summaryDiv.appendChild(summaryText);
+
+                contentDiv.appendChild(summaryDiv);
+            }
+
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function addLoadingMessage() {
+            const loadingId = 'loading-' + Date.now();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+            messageDiv.id = loadingId;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = `
+                <div class="loading">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <p style="margin-top: 10px;">Searching patents and generating summary...</p>
+            `;
+
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            return loadingId;
+        }
+
+        function removeLoadingMessage(loadingId) {
+            const loadingMsg = document.getElementById(loadingId);
+            if (loadingMsg) {
+                loadingMsg.remove();
+            }
+        }
+
+        async function exportCSV() {
+            try {
+                const response = await fetch(`${API_URL}/export-csv`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Export failed');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `patent_search_${new Date().toISOString().slice(0,10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+                alert('CSV exported successfully!');
+            } catch (error) {
+                alert('Error exporting CSV: ' + error.message);
+            }
+        }
+
+        async function clearHistory() {
+            if (!confirm('Are you sure you want to clear all chat history?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/clear-history`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to clear history');
+                }
+
+                chatContainer.innerHTML = `
+                    <div class="welcome-message">
+                        <h2>Welcome to Patent Search Assistant!</h2>
+                        <p>Search for patents and get AI-powered summaries instantly.</p>
+                        <p style="margin-top: 10px; font-size: 14px;">Try searching for: "artificial intelligence", "solar panels", "medical devices"</p>
+                    </div>
+                `;
+                alert('History cleared successfully!');
+            } catch (error) {
+                alert('Error clearing history: ' + error.message);
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_URL}/history`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to load history');
+                }
+
+                const history = await response.json();
+                if (!Array.isArray(history) || history.length === 0) {
+                    ensureWelcomeState();
+                    return;
+                }
+
+                chatContainer.innerHTML = '';
+                history.forEach(entry => {
+                    addMessage('user', entry.query);
+                    addPatentResults(entry);
+                });
+            } catch (error) {
+                console.error('Unable to load existing history:', error);
+            } finally {
+                ensureWelcomeState();
+            }
+        }
+    </script>
+</body>
+</html>
