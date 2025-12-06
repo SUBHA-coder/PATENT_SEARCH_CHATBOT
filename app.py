@@ -16,6 +16,7 @@ from datetime import datetime
 import io
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
+import json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -193,15 +194,21 @@ def summarize_with_llm(patent_data: List[Dict[str, Any]]) -> str:
             patent_text += f"Abstract: {patent.get('abstract', 'N/A')}\n"
 
         # Create prompt for LLM
-        prompt = f"""You are a patent analyst. Summarize the following patents in a clear and concise manner. 
-For each patent, provide:
-1. A brief overview of what it covers
-2. Key innovations or features
+        prompt = f"""You are a patent analyst. Summarize the following patents.
+For each patent, provide a clear and concise professional summary covering:
+1. Overview
+2. Key innovations
 3. Potential applications
 
-Patents to analyze:{patent_text}
+IMPORTANT: Return the output ONLY as a valid JSON object where keys are the patent indices (1, 2, 3...) corresponding to the list below, and values are the summary strings. Do not include markdown formatting (like ```json), explanations, or any other text.
 
-Provide a professional summary that would be useful for researchers or business professionals."""
+Example format:
+{{
+  "1": "Summary for patent 1...",
+  "2": "Summary for patent 2..."
+}}
+
+Patents to analyze:{patent_text}"""
 
         # Call Groq API with fallback models
         # Try models in order of preference
@@ -223,7 +230,7 @@ Provide a professional summary that would be useful for researchers or business 
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a helpful patent analyst that writes concise, professional briefings.",
+                            "content": "You are a helpful patent analyst that writes concise, professional briefings. You always output valid JSON.",
                         },
                         {
                             "role": "user",
@@ -231,13 +238,41 @@ Provide a professional summary that would be useful for researchers or business 
                         },
                     ],
                     model=model,
-                    temperature=0.5,
+                    temperature=0.3, # Lower temperature for more consistent JSON
                     max_tokens=2000,
+                    response_format={"type": "json_object"}, # Force JSON mode if supported
                 )
 
-                summary = chat_completion.choices[0].message.content
+                content = chat_completion.choices[0].message.content
                 print(f"Successfully generated summary using model: {model}")
-                return summary
+                
+                # Parse JSON response
+                try:
+                    # Clean potential markdown formatting just in case
+                    clean_content = content.replace("```json", "").replace("```", "").strip()
+                    summaries = json.loads(clean_content)
+                    
+                    combined_summary = ""
+                    for idx, patent in enumerate(patent_data, 1):
+                        # Get summary for this patent index (as string)
+                        # Try string index "1" then integer 1 just in case
+                        pat_summary = summaries.get(str(idx)) or summaries.get(idx) or "Summary not available."
+                        
+                        # Store individual summary in patent object for CSV export
+                        patent["ai_summary"] = pat_summary
+                        
+                        # Add to combined summary for display
+                        combined_summary += f"Patent {idx} ({patent.get('patent_number', 'N/A')}):\n{pat_summary}\n\n"
+                    
+                    return combined_summary.strip()
+                    
+                except json.JSONDecodeError:
+                    print(f"Failed to parse JSON summary: {content[:100]}...")
+                    # Fallback: Treat entire response as summary and assign to all
+                    for patent in patent_data:
+                        patent["ai_summary"] = content
+                    return content
+
             except Exception as model_error:
                 last_error = model_error
                 error_str = str(model_error)
@@ -402,7 +437,8 @@ def export_csv():
                         patent.get("abstract"),
                         patent.get("date"),
                         patent.get("assignee"),
-                        entry["summary"],
+                        patent.get("assignee"),
+                        patent.get("ai_summary", entry["summary"]),
                     ]
                 )
 
